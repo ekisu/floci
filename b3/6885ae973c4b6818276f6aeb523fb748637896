@@ -1,0 +1,30 @@
+src/test/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeInvokerTest.java
+  s_d9b76ff88af209::t_389db788fa475d 98
+  s_d9b76ff88af209::t_556f579e1a3643 7-8,38,49,61,69-97,99-102
+  s_d9b76ff88af209::t_a266408250aa47 103
+src/main/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeInvoker.java
+  s_d9b76ff88af209::t_6f6046dcfd93f8 8,11,25,30,46,58,68,81,127-129,225-237,239,241-261
+  s_d9b76ff88af209::t_389db788fa475d 238,240
+  s_d9b76ff88af209::t_7d4df7e9a01f3e 262-263
+docs/services/eventbridge.md
+  s_d9b76ff88af209::t_883cdbca4a0af5 124
+  s_d9b76ff88af209::t_18f9039364c3fb 122-123,125-171,177-178
+src/test/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeLogsTargetIntegrationTest.java
+  s_d9b76ff88af209::t_7caf85631c0eda 1-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "b36885ae973c4b6818276f6aeb523fb748637896",
+  "prompts": {},
+  "sessions": {
+    "s_d9b76ff88af209": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f7d672e29ffeaIbBS43Ed8Jjkt",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    }
+  }
+}
