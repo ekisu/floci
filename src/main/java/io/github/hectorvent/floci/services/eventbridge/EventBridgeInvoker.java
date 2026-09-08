@@ -1,5 +1,6 @@
 package io.github.hectorvent.floci.services.eventbridge;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.MissingNode;
@@ -7,6 +8,7 @@ import io.github.hectorvent.floci.config.EmulatorConfig;
 import io.github.hectorvent.floci.core.common.AwsArnUtils;
 import io.github.hectorvent.floci.core.common.RegionResolver;
 import io.github.hectorvent.floci.services.batch.BatchService;
+import io.github.hectorvent.floci.services.cloudwatch.logs.CloudWatchLogsService;
 import io.github.hectorvent.floci.services.eventbridge.model.InputTransformer;
 import io.github.hectorvent.floci.services.eventbridge.model.Target;
 import io.github.hectorvent.floci.services.firehose.FirehoseService;
@@ -20,10 +22,12 @@ import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @ApplicationScoped
 public class EventBridgeInvoker {
@@ -39,6 +43,7 @@ public class EventBridgeInvoker {
     private final SnsService snsService;
     private final BatchService batchService;
     private final FirehoseService firehoseService;
+    private final CloudWatchLogsService logsService;
     private final EventBridgeService eventBridgeService;
     private final RegionResolver regionResolver;
     private final ObjectMapper objectMapper;
@@ -50,6 +55,7 @@ public class EventBridgeInvoker {
                               SnsService snsService,
                               BatchService batchService,
                               FirehoseService firehoseService,
+                              CloudWatchLogsService logsService,
                               EventBridgeService eventBridgeService,
                               RegionResolver regionResolver,
                               ObjectMapper objectMapper,
@@ -59,6 +65,7 @@ public class EventBridgeInvoker {
         this.snsService = snsService;
         this.batchService = batchService;
         this.firehoseService = firehoseService;
+        this.logsService = logsService;
         this.eventBridgeService = eventBridgeService;
         this.regionResolver = regionResolver;
         this.objectMapper = objectMapper;
@@ -71,7 +78,7 @@ public class EventBridgeInvoker {
                        ObjectMapper objectMapper,
                        EmulatorConfig config) {
         this(lambdaService, sqsService, snsService,
-                null /* batch */, null /* firehose */, null /* eventBridge */, null /* regionResolver */,
+                null /* batch */, null /* firehose */, null /* logs */, null /* eventBridge */, null /* regionResolver */,
                 objectMapper, config);
     }
 
@@ -117,6 +124,8 @@ public class EventBridgeInvoker {
                         targetRegion
                 );
                 LOG.debugv("EventBridge delivered to Batch: {0}", arn);
+            } else if (arn.contains(":logs:")) {
+                deliverToLogs(target, eventJson, payload);
             } else if (arn.contains(":firehose:") && arn.contains(":deliverystream/")) {
                 if (firehoseService == null) {
                     LOG.warnv("EventBridge Firehose target missing Firehose service: {0}", arn);
@@ -210,6 +219,57 @@ public class EventBridgeInvoker {
         } catch (Exception e) {
             LOG.warnv("EventBridge failed to deliver to target {0}: {1}", arn, e.getMessage());
         }
+    }
+
+    private void deliverToLogs(Target target, String eventJson, String payload)
+            throws JsonProcessingException {
+        if (!target.getArn().matches("arn:[^:]+:logs:[^:]+:[^:]+:log-group:[.\\-_/#A-Za-z0-9]{1,512}(:\\*)?")) {
+            LOG.warnv("EventBridge invalid CloudWatch Logs target ARN: {0}", target.getArn());
+            return;
+        }
+        if (target.getInput() != null || target.getInputPath() != null) {
+            LOG.warnv("EventBridge CloudWatch Logs target does not support Input or InputPath: {0}", target.getArn());
+            return;
+        }
+        var arn = AwsArnUtils.parse(target.getArn());
+        if (target.getAccountId() == null || target.getAccountId().isBlank()) {
+            LOG.warnv("EventBridge CloudWatch Logs target has no owning account; register it again: {0}", target.getArn());
+            return;
+        }
+        if (!arn.accountId().equals(target.getAccountId())) {
+            LOG.warnv("EventBridge CloudWatch Logs target must belong to the same account as the rule: {0}",
+                    target.getArn());
+            return;
+        }
+        String groupName = arn.resource().substring("log-group:".length());
+        if (groupName.endsWith(":*")) {
+            groupName = groupName.substring(0, groupName.length() - 2);
+        }
+        long timestamp;
+        String message;
+        if (target.getInputTransformer() != null) {
+            JsonNode transformed = objectMapper.readTree(payload);
+            if (transformed == null || !transformed.path("timestamp").isTextual()
+                    || !transformed.path("message").isTextual()) {
+                LOG.warnv("EventBridge CloudWatch Logs target requires a timestamp and a string message: {0}",
+                        target.getArn());
+                return;
+            }
+            timestamp = Instant.parse(transformed.get("timestamp").asText()).toEpochMilli();
+            message = transformed.get("message").asText();
+        } else {
+            JsonNode event = objectMapper.readTree(eventJson);
+            timestamp = Instant.parse(event.path("time").asText()).toEpochMilli();
+            message = eventJson;
+        }
+        // A fresh stream avoids racing another delivery's stream creation or metadata update.
+        String streamName = "eventbridge/" + UUID.randomUUID();
+        // Preserve the storage backend's legacy-key fallback for the current account.
+        String account = arn.accountId().equals(regionResolver.getAccountId()) ? null : arn.accountId();
+        logsService.createLogStreamForAccount(account, groupName, streamName, arn.region());
+        logsService.putLogEventsForAccount(account, groupName, streamName,
+                List.of(Map.of("timestamp", timestamp, "message", message)), arn.region());
+        LOG.debugv("EventBridge delivered to CloudWatch Logs: {0}", target.getArn());
     }
 
     String applyInputPath(String inputPath, String eventJson) {

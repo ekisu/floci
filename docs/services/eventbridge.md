@@ -119,10 +119,64 @@ aws events put-targets \
   --endpoint-url $AWS_ENDPOINT_URL
 ```
 
+## CloudWatch Logs Targets
+
+A rule can target an existing [CloudWatch Logs](cloudwatch.md) log group. Use
+the log-group ARN, without a log-stream suffix. A trailing `:*` is also accepted.
+Floci resolves the destination from the ARN and requires its account to match
+the owning rule's account.
+
+```bash
+aws logs create-log-group --log-group-name /aws/events/orders \
+  --endpoint-url "$AWS_ENDPOINT_URL"
+
+aws events put-targets \
+  --rule order-placed-rule \
+  --event-bus-name my-bus \
+  --targets '[{
+    "Id": "order-logs",
+    "Arn": "arn:aws:logs:us-east-1:000000000000:log-group:/aws/events/orders"
+  }]' \
+  --endpoint-url "$AWS_ENDPOINT_URL"
+
+aws logs filter-log-events --log-group-name /aws/events/orders \
+  --endpoint-url "$AWS_ENDPOINT_URL"
+```
+
+By default, each matching event becomes a log entry containing the full event JSON,
+with the event envelope's `time` converted to epoch milliseconds for the log timestamp.
+An `InputTransformer` must produce an object with an ISO 8601 `timestamp` string and
+a `message` string, for example:
+
+```json
+{
+  "InputPathsMap": {"timestamp": "$.time", "message": "$.detail.message"},
+  "InputTemplate": "{\"timestamp\":<timestamp>,\"message\":<message>}"
+}
+```
+
+The message is stored as text, without JSON string delimiters. `Input` and `InputPath`
+are unsupported for Logs targets. Floci accepts target registration, but rejects these
+options, invalid Logs destination ARNs, cross-account Logs targets, and invalid
+transformed payloads during delivery with a warning.
+
+On AWS, configure a Logs resource policy granting `events.amazonaws.com`
+`logs:CreateLogStream` and `logs:PutLogEvents`, and omit target `RoleArn`. See
+[AWS resource-based permissions](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-use-resource-based.html#eb-cloudwatchlogs-permissions)
+and [input transformation](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-transform-target-input.html).
+Floci stores resource policies but does not evaluate them on Logs writes, and its
+target model ignores `RoleArn`. Delivery neither creates nor modifies policies.
+
+Floci creates one `eventbridge/<uuid>` stream per delivery to avoid concurrent stream
+creation and metadata-update races. Stream names and grouping do not reproduce AWS's
+internal stream allocation. Missing log groups are never created implicitly.
+
 ## Current Behavior
 
 - `PutEvents` reports success once the source bus accepts an event, so target delivery failures surface only as a `WARN` in the Floci logs.
 - A `Detail` forwarded to an event bus must be a JSON object, as in AWS; anything else is dropped, including an `InputPath` selecting a scalar such as `$.detail.orderId` or an envelope carrying `"detail": null`.
 - A bus ARN naming another account is forwarded under that account, so the target bus and its rules resolve there.
-- Onward delivery from that bus follows each target type: SQS resolves cross-account, while Lambda, SNS, Batch and Firehose resolve in the caller's account.
+- CloudWatch Logs targets must belong to the receiving rule's account. A forwarded event keeps its originating account in the envelope, but can be delivered to Logs in the receiving bus's account. Direct cross-account Logs delivery is dropped with a warning.
+- Target registration persists the owning account internally. Legacy stored Logs targets without this metadata must be registered again with `PutTargets` before delivery; Floci drops them with a warning rather than inferring ownership from the sender.
+- Logs delivery uses the same synchronous, warning-only failure handling as other targets. Target retry policies and dead-letter delivery are not implemented by this path.
 - An event is forwarded between buses only once, matching AWS: a bus that received an event from another bus does not forward it on to a third. The second hop is dropped with only a `WARN` rather than reported to the caller.

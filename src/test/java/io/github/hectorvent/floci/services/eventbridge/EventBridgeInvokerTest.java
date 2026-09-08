@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.github.hectorvent.floci.core.common.RegionResolver;
 import io.github.hectorvent.floci.services.batch.BatchService;
+import io.github.hectorvent.floci.core.common.AwsException;
+import io.github.hectorvent.floci.services.cloudwatch.logs.CloudWatchLogsService;
 import io.github.hectorvent.floci.services.eventbridge.model.BatchParameters;
 import io.github.hectorvent.floci.services.eventbridge.model.InputTransformer;
 import io.github.hectorvent.floci.services.eventbridge.model.Target;
@@ -33,6 +35,7 @@ class EventBridgeInvokerTest {
     private SqsService sqsService;
     private BatchService batchService;
     private FirehoseService firehoseService;
+    private CloudWatchLogsService logsService;
     private EventBridgeService eventBridgeService;
     private RegionResolver regionResolver;
 
@@ -43,6 +46,7 @@ class EventBridgeInvokerTest {
         SnsService snsService = mock(SnsService.class);
         batchService = mock(BatchService.class);
         firehoseService = mock(FirehoseService.class);
+        logsService = mock(CloudWatchLogsService.class);
         eventBridgeService = mock(EventBridgeService.class);
         regionResolver = mock(RegionResolver.class);
         when(regionResolver.getAccountId()).thenReturn("000000000000");
@@ -54,11 +58,91 @@ class EventBridgeInvokerTest {
                 snsService,
                 batchService,
                 firehoseService,
+                logsService,
                 eventBridgeService,
                 regionResolver,
                 new ObjectMapper(),
                 mock(io.github.hectorvent.floci.config.EmulatorConfig.class)
         );
+    }
+
+    @Test
+    void invokeTarget_logsUsesRegisteredArnAccountWhenCallerAndEnvelopeDiffer() {
+        Target target = new Target("logs", "arn:aws:logs:us-east-1:000000000002:log-group:/aws/events/test", null, null);
+        target.setAccountId("000000000002");
+        invoker.invokeTarget(target, "{\"account\":\"000000000000\",\"time\":\"2026-09-08T00:00:00Z\"}", "us-east-1");
+        verify(logsService).createLogStreamForAccount(eq("000000000002"), eq("/aws/events/test"),
+                anyString(), eq("us-east-1"));
+        verify(logsService).putLogEventsForAccount(eq("000000000002"), eq("/aws/events/test"),
+                anyString(), anyList(), eq("us-east-1"));
+    }
+
+    @Test
+    void invokeTarget_logsStreamCreationFailureDoesNotAttemptWrite() {
+        doThrow(new AwsException("ServiceUnavailableException", "Logs unavailable", 500))
+                .when(logsService).createLogStreamForAccount(any(), anyString(), anyString(), anyString());
+        Target target = new Target("logs", "arn:aws:logs:us-east-1:000000000000:log-group:/aws/events/test", null, null);
+        target.setAccountId("000000000000");
+        invoker.invokeTarget(target, "{\"time\":\"2026-09-08T00:00:00Z\"}", "us-east-1");
+        verify(logsService).createLogStreamForAccount(isNull(), eq("/aws/events/test"), anyString(), eq("us-east-1"));
+        verify(logsService, never()).putLogEventsForAccount(any(), anyString(), anyString(), anyList(), anyString());
+    }
+
+    @Test
+    void invokeTarget_malformedLogsTransformerDoesNotCreateStreams() {
+        String arn = "arn:aws:logs:us-east-1:000000000000:log-group:/aws/events/test";
+        Target transformer = new Target("logs", arn, null, null);
+        transformer.setAccountId("000000000000");
+        transformer.setInputTransformer(new InputTransformer(Map.of(), "{\"message\":\"no timestamp\"}"));
+        invoker.invokeTarget(transformer, "{\"time\":\"2026-09-08T00:00:00Z\",\"detail\":{}}", "us-east-1");
+        verifyNoInteractions(logsService);
+    }
+
+    @Test
+    void invokeTarget_logsTransformerUsesSelectedTimestampWithoutParsingEnvelopeTime() {
+        Target target = new Target("logs",
+                "arn:aws:logs:us-east-1:000000000000:log-group:/aws/events/test", null, null);
+        target.setAccountId("000000000000");
+        target.setInputTransformer(new InputTransformer(Map.of(),
+                "{\"timestamp\":\"2026-09-08T00:00:00Z\",\"message\":\"transformed\"}"));
+
+        for (String event : List.of("{}", "{\"time\":\"invalid\"}")) {
+            invoker.invokeTarget(target, event, "us-east-1");
+        }
+
+        verify(logsService, times(2)).putLogEventsForAccount(isNull(), eq("/aws/events/test"), anyString(),
+                eq(List.of(Map.of("timestamp", 1788825600000L, "message", "transformed"))), eq("us-east-1"));
+    }
+
+    @Test
+    void invokeTarget_logsInvalidSelectedTimestampDoesNotCreateStreams() {
+        Target target = new Target("logs",
+                "arn:aws:logs:us-east-1:000000000000:log-group:/aws/events/test", null, null);
+        target.setAccountId("000000000000");
+        invoker.invokeTarget(target, "{\"time\":\"invalid\"}", "us-east-1");
+        invoker.invokeTarget(target, "{}", "us-east-1");
+
+        target.setInputTransformer(new InputTransformer(Map.of(),
+                "{\"timestamp\":\"invalid\",\"message\":\"transformed\"}"));
+        invoker.invokeTarget(target, "{\"time\":\"2026-09-08T00:00:00Z\"}", "us-east-1");
+
+        verifyNoInteractions(logsService);
+    }
+
+    @Test
+    void invokeTarget_logsOwnershipSurvivesSerializationAndMissingOwnershipIsDropped() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        Target target = new Target("logs", "arn:aws:logs:us-east-1:000000000002:log-group:/aws/events/test", null, null);
+        String event = "{\"account\":\"000000000002\",\"time\":\"2026-09-08T00:00:00Z\"}";
+        Target legacy = mapper.readValue(mapper.writeValueAsString(target), Target.class);
+        invoker.invokeTarget(legacy, event, "us-east-1");
+        verifyNoInteractions(logsService);
+
+        target.setAccountId("000000000002");
+        Target restored = mapper.readValue(mapper.writeValueAsString(target), Target.class);
+        invoker.invokeTarget(restored, event, "us-east-1");
+        verify(logsService).putLogEventsForAccount(eq("000000000002"), eq("/aws/events/test"),
+                anyString(), anyList(), eq("us-east-1"));
     }
 
     @Test

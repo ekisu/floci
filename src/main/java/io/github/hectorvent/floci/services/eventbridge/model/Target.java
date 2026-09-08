@@ -9,6 +9,7 @@ public class Target {
 
     private String id;
     private String arn;
+    private String accountId;
     private String input;
     private String inputPath;
     private InputTransformer inputTransformer;
@@ -29,6 +30,9 @@ public class Target {
 
     public String getArn() { return arn; }
     public void setArn(String arn) { this.arn = arn; }
+
+    public String getAccountId() { return accountId; }
+    public void setAccountId(String accountId) { this.accountId = accountId; }
 
     public String getInput() { return input; }
     public void setInput(String input) { this.input = input; }

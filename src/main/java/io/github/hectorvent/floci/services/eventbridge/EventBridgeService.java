@@ -413,6 +413,7 @@ public class EventBridgeService implements ResourceProvider {
                         "Rule not found: " + ruleName, 400));
         List<Target> existing = new ArrayList<>(targetStore.get(key).orElse(new ArrayList<>()));
         for (Target newTarget : newTargets) {
+            newTarget.setAccountId(regionResolver.getAccountId());
             existing.removeIf(t -> t.getId().equals(newTarget.getId()));
             existing.add(newTarget);
         }
