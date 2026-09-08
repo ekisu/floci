@@ -1,0 +1,68 @@
+src/main/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeInvoker.java
+  s_0d5d1e15eca809::t_34fca563026290 3,233-234,244-247
+  s_d9b76ff88af209::t_6f6046dcfd93f8 9,12,26,31,47,59,69,82,128,130,228-232,235-243,248-255
+  s_de18cafd1d13cf::t_2e4fcd7a8906d4 227
+  s_e9f077bac971d3::t_ba13d5d69b0696 129,226
+  s_d9b76ff88af209::t_7d4df7e9a01f3e 256-257
+src/test/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeInvokerTest.java
+  s_0d5d1e15eca809::t_3d3453a2de8d8e 95,124
+  s_e9f077bac971d3::t_e9a7d9ab207538 90,94
+  s_d9b76ff88af209::t_556f579e1a3643 7-8,38,49,61,69,81-89,91-93
+  s_e9f077bac971d3::t_8bf4a532b67363 70-79
+  s_0d5d1e15eca809::t_34fca563026290 80,96-123,125
+  s_0d5d1e15eca809::t_c01340ac3a787e 126
+src/main/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeService.java
+  s_e9f077bac971d3::t_ba13d5d69b0696 414-415,417-419,421-429
+  s_e9f077bac971d3::t_010cc2504f13fe 416,420
+docs/services/eventbridge.md
+  s_de18cafd1d13cf::t_a8099ba19ae853 126-127
+  s_d9b76ff88af209::t_883cdbca4a0af5 124
+  s_d9b76ff88af209::t_18f9039364c3fb 122-123,125,128-158,162-173,180
+  s_e9f077bac971d3::t_010cc2504f13fe 159-161,179
+src/test/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeLogsTargetIntegrationTest.java
+  s_e9f077bac971d3::t_8bf4a532b67363 152-173
+  s_d9b76ff88af209::t_7caf85631c0eda 1-65,67-73,84-86,90,105,149,151,174-259,265-269,271-272
+  s_e9f077bac971d3::t_010cc2504f13fe 66,74-83,91-104,106-117,260-264,270
+  s_de18cafd1d13cf::t_0be9db13df77ba 87-89,118-148
+  s_d9b76ff88af209::t_1c05b90b678633 150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "7de6ba3ad771acf71162a2166816faeca9505a02",
+  "prompts": {},
+  "sessions": {
+    "s_0d5d1e15eca809": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f7d33b555ffepxZAVWPUbQ49kk",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    },
+    "s_d9b76ff88af209": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f7d672e29ffeaIbBS43Ed8Jjkt",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    },
+    "s_de18cafd1d13cf": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f7d17769dffeTDF1MpkxEKilmx",
+        "model": "unknown"
+      },
+      "human_author": null
+    },
+    "s_e9f077bac971d3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f7d0b7fbfffeyt57QUd9lTkXYO",
+        "model": "unknown"
+      },
+      "human_author": null
+    }
+  }
+}
