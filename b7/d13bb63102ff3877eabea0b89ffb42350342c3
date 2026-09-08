@@ -1,0 +1,64 @@
+src/main/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeInvoker.java
+  s_0d5d1e15eca809::t_34fca563026290 3,135-138,258-259,269-272
+  s_d9b76ff88af209::t_6f6046dcfd93f8 9,12,26,31,47,59,69,82,134,140,238-243,248-253,255,257,260-268,273-280
+  s_de18cafd1d13cf::t_b9dae7c5256421 87-89
+  s_de18cafd1d13cf::t_2e4fcd7a8906d4 90-92,139,236-237,244-247
+  s_d9b76ff88af209::t_389db788fa475d 254,256
+  s_d9b76ff88af209::t_7d4df7e9a01f3e 281-282
+src/test/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeServiceTest.java
+  s_de18cafd1d13cf::t_0be9db13df77ba 467,488,509,745,773,800,824,843
+docs/services/eventbridge.md
+  s_d9b76ff88af209::t_18f9039364c3fb 122-123,125,128-172,179
+  s_de18cafd1d13cf::t_a8099ba19ae853 126-127
+  s_de18cafd1d13cf::t_2e4fcd7a8906d4 178
+  s_d9b76ff88af209::t_883cdbca4a0af5 124
+src/test/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeInvokerTest.java
+  s_0d5d1e15eca809::t_3d3453a2de8d8e 109,155
+  s_0d5d1e15eca809::t_11fae89a3a3114 111
+  s_0d5d1e15eca809::t_c01340ac3a787e 157
+  s_d9b76ff88af209::t_389db788fa475d 106
+  s_0d5d1e15eca809::t_34fca563026290 78,88,100,110,112-154,156
+  s_d9b76ff88af209::t_556f579e1a3643 7-8,38,49,61,69,79-87,89-99,101-105,107-108
+  s_de18cafd1d13cf::t_a8099ba19ae853 70-77
+src/test/java/io/github/hectorvent/floci/services/ecs/EcsEventBridgeIntegrationTest.java
+  s_de18cafd1d13cf::t_0be9db13df77ba 55
+src/main/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeService.java
+  s_de18cafd1d13cf::t_2e4fcd7a8906d4 756-758
+src/main/java/io/github/hectorvent/floci/services/eventbridge/RuleScheduler.java
+  s_de18cafd1d13cf::t_2e4fcd7a8906d4 143-144
+src/test/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeLogsTargetIntegrationTest.java
+  s_de18cafd1d13cf::t_0be9db13df77ba 66,78-80,83-113
+  s_d9b76ff88af209::t_7caf85631c0eda 1-65,67-77,81-82,114-210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "b7d13bb63102ff3877eabea0b89ffb42350342c3",
+  "prompts": {},
+  "sessions": {
+    "s_0d5d1e15eca809": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f7d33b555ffepxZAVWPUbQ49kk",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    },
+    "s_d9b76ff88af209": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f7d672e29ffeaIbBS43Ed8Jjkt",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    },
+    "s_de18cafd1d13cf": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f7d17769dffeTDF1MpkxEKilmx",
+        "model": "unknown"
+      },
+      "human_author": null
+    }
+  }
+}
