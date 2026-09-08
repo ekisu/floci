@@ -1,0 +1,23 @@
+src/main/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeInvoker.java
+  s_0d5d1e15eca809::t_34fca563026290 3,129-132,230,247-248,258-261
+src/test/java/io/github/hectorvent/floci/services/eventbridge/EventBridgeInvokerTest.java
+  s_0d5d1e15eca809::t_34fca563026290 70,80,92,104-146,148
+  s_0d5d1e15eca809::t_3d3453a2de8d8e 147
+  s_0d5d1e15eca809::t_c01340ac3a787e 149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "f003c90d22bc4a37db94497779a4d481f241579f",
+  "prompts": {},
+  "sessions": {
+    "s_0d5d1e15eca809": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f7d33b555ffepxZAVWPUbQ49kk",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    }
+  }
+}
