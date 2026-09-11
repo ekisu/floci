@@ -34,6 +34,25 @@ class CloudFormationTemplateEngineTest {
     }
 
     @Test
+    void subResolvesBootstrapBucketAttributeAndHonoursOverridesAndEscapes() {
+        CloudFormationTemplateEngine e = new CloudFormationTemplateEngine("000000000000",
+                "sa-east-1", "bootstrap", "stack/id", Map.of(),
+                Map.of("StagingBucket", "cdk-assets"),
+                Map.of("StagingBucket", Map.of("RegionalDomainName", "cdk-assets.s3.sa-east-1.amazonaws.com")),
+                Map.of(), Map.of(), mapper, name -> null);
+        assertEquals("https://cdk-assets.s3.sa-east-1.amazonaws.com/cdk/template.yml", e.resolve(json("""
+                {"Fn::Sub":"https://${StagingBucket.RegionalDomainName}/cdk/template.yml"}
+                """)));
+        assertEquals("override/cdk-assets/sa-east-1", e.resolve(json("""
+                {"Fn::Sub":["${StagingBucket.RegionalDomainName}/${StagingBucket}/${AWS::Region}",
+                  {"StagingBucket.RegionalDomainName":"override"}]}
+                """)));
+        assertEquals("${StagingBucket.RegionalDomainName}/${AWS::Region}", e.resolve(json("""
+                {"Fn::Sub":"${!StagingBucket.RegionalDomainName}/${!AWS::Region}"}
+                """)));
+    }
+
+    @Test
     void joinAcceptsSplitAsItsListOfValues() {
         assertEquals("x|y|z", engine().resolve(json("""
                 {"Fn::Join": ["|", {"Fn::Split": [",", "x,y,z"]}]}

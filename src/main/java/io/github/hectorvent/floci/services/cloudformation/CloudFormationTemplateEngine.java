@@ -226,7 +226,9 @@ public class CloudFormationTemplateEngine {
                 String varName = template.substring(i + 2, end);
                 if (vars.containsKey(varName)) {
                     result.append(vars.get(varName));
-                } else if (varName.contains("!")) {
+                } else if (varName.startsWith("!")) {
+                    result.append("${").append(varName.substring(1)).append('}');
+                } else if (varName.contains(".")) {
                     // Fn::GetAtt shorthand: ${LogicalId.Attr}
                     String[] parts = varName.split("\\.", 2);
                     result.append(resolveGetAttParts(parts[0], parts.length > 1 ? parts[1] : ""));
