@@ -229,19 +229,6 @@ public class ContainerLifecycleManager {
         startContainer(containerId);
         LOG.infov("Started container {0}", containerId);
 
-        if (spec.networkMode() != null && !spec.networkMode().isBlank() && spec.hasPortBindings()) {
-            try {
-                dockerClient.connectToNetworkCmd()
-                        .withContainerId(containerId)
-                        .withNetworkId(spec.networkMode())
-                        .exec();
-                LOG.debugv("Connected container {0} to network {1}", containerId, spec.networkMode());
-            } catch (Exception e) {
-                LOG.warnv("Could not connect container {0} to network {1}: {2}",
-                        containerId, spec.networkMode(), e.getMessage());
-            }
-        }
-
         Map<Integer, EndpointInfo> endpoints = resolveEndpoints(containerId, spec);
         return new ContainerInfo(containerId, endpoints);
     }
@@ -888,11 +875,9 @@ public class ContainerLifecycleManager {
             hostConfig.withPortBindings(ports);
         }
 
-        // Network mode: only set during creation when there are no host port bindings.
-        // withNetworkMode() + port bindings suppresses port publishing on macOS Docker Desktop,
-        // so containers with port bindings (e.g. ECR registry) connect to the network
-        // after start via connectToNetworkCmd() instead.
-        if (spec.networkMode() != null && !spec.networkMode().isBlank() && !spec.hasPortBindings()) {
+        // Select the network before starting, including for published ports, so an
+        // explicitly isolated container never acquires Docker's default bridge.
+        if (spec.networkMode() != null && !spec.networkMode().isBlank()) {
             hostConfig.withNetworkMode(spec.networkMode());
         }
 
@@ -958,9 +943,7 @@ public class ContainerLifecycleManager {
             return new EndpointInfo("localhost", containerPort);
         } else {
             // Container mode: use container IP on the docker network.
-            // Prefer the configured network's IP — the container may be on multiple
-            // networks (bridge + the configured network) when connectToNetworkCmd()
-            // is used instead of withNetworkMode() during creation.
+            // Prefer the configured network's IP when adopting a multi-network container.
             String containerIp = resolveContainerIp(inspect, preferredNetwork);
             return new EndpointInfo(containerIp, containerPort);
         }
