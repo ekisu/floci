@@ -1,0 +1,23 @@
+src/main/java/io/github/hectorvent/floci/services/cloudformation/InlineZipPackager.java
+  s_f667c7a42588d5::t_ce46d88e865ae7 3-4,8,25-50,134,136,143,151
+src/test/java/io/github/hectorvent/floci/services/cloudformation/InlineZipCfnResponseModuleTest.java
+  s_f667c7a42588d5::t_67d651a5f2845d 3
+  s_f667c7a42588d5::t_7629726d7b50a5 5-7,18,30-68
+  s_f667c7a42588d5::t_6f5cac49c3b4b7 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1d1c6fb8d7a0f1723dfb041976b439ec15a4e757",
+  "prompts": {},
+  "sessions": {
+    "s_f667c7a42588d5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f6d1ec8f5ffeCU4AY7hp6YGoAv",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    }
+  }
+}
