@@ -1,8 +1,11 @@
 package io.github.hectorvent.floci.services.cloudformation;
 
+import io.github.hectorvent.floci.core.common.AwsException;
+
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -18,6 +21,32 @@ import java.util.zip.ZipOutputStream;
  * provisioner extraction can take it along unchanged.</p>
  */
 final class InlineZipPackager {
+
+    private static final Pattern PYTHON_RUNTIME = Pattern.compile("python[23]\\.[0-9]+");
+    private static final Pattern NODE_RUNTIME = Pattern.compile("nodejs(?:[0-9]+\\.(?:x|[0-9]+))?");
+    private static final Pattern LAMBDA_IMAGE = Pattern.compile(
+            "(?:public\\.ecr\\.aws/lambda/|(?:docker\\.io/)?amazon/aws-lambda-)(python|nodejs)"
+                    + "(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?(?:@sha256:[a-fA-F0-9]{64})?");
+
+    private enum Language { PYTHON, NODE }
+
+    private static Language language(String runtime) {
+        if (runtime != null) {
+            if (PYTHON_RUNTIME.matcher(runtime).matches()) {
+                return Language.PYTHON;
+            }
+            if (NODE_RUNTIME.matcher(runtime).matches()) {
+                return Language.NODE;
+            }
+            var image = LAMBDA_IMAGE.matcher(runtime);
+            if (image.matches()) {
+                return image.group(1).equals("python") ? Language.PYTHON : Language.NODE;
+            }
+        }
+        throw new AwsException("ValidationError", "Code.ZipFile requires a Python or Node.js runtime "
+                + "identifier or a known AWS Lambda Python or Node.js runtime image; cannot determine "
+                + "inline source language for runtime: " + runtime, 400);
+    }
 
     /**
      * The cfn-response module for Node.js. Unlike AWS's canonical module this one honors
@@ -102,15 +131,16 @@ final class InlineZipPackager {
     private InlineZipPackager() {}
 
     static String sourceToZipBase64(String source, String handler, String runtime) {
+        Language language = language(runtime);
         String module = handler.contains(".") ? handler.substring(0, handler.lastIndexOf('.')) : "index";
-        String ext = runtime.startsWith("python") ? ".py" : ".js";
+        String ext = language == Language.PYTHON ? ".py" : ".js";
         try {
             var baos = new ByteArrayOutputStream();
             try (var zos = new ZipOutputStream(baos)) {
                 zos.putNextEntry(new ZipEntry(module + ext));
                 zos.write(source.getBytes(StandardCharsets.UTF_8));
                 zos.closeEntry();
-                if (runtime.startsWith("nodejs")) {
+                if (language == Language.NODE) {
                     zos.putNextEntry(new ZipEntry("node_modules/cfn-response/package.json"));
                     zos.write("{\"name\":\"cfn-response\",\"main\":\"cfn-response.js\"}"
                             .getBytes(StandardCharsets.UTF_8));
@@ -118,7 +148,7 @@ final class InlineZipPackager {
                     zos.putNextEntry(new ZipEntry("node_modules/cfn-response/cfn-response.js"));
                     zos.write(CFN_RESPONSE_JS.getBytes(StandardCharsets.UTF_8));
                     zos.closeEntry();
-                } else if (runtime.startsWith("python")) {
+                } else {
                     zos.putNextEntry(new ZipEntry("cfnresponse.py"));
                     zos.write(CFN_RESPONSE_PY.getBytes(StandardCharsets.UTF_8));
                     zos.closeEntry();
