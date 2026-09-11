@@ -1,0 +1,21 @@
+src/main/java/io/github/hectorvent/floci/core/common/docker/ContainerLifecycleManager.java
+  s_559e6c81d0320a::t_96f569001a1e94 878-880,946
+src/test/java/io/github/hectorvent/floci/core/common/docker/ContainerLifecycleManagerNetworkTest.java
+  s_559e6c81d0320a::t_6d2fc7f1045e6c 1-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "151bf580ca33eadc6139b2c56f368eb40f8a224f",
+  "prompts": {},
+  "sessions": {
+    "s_559e6c81d0320a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f6debbb5cffeG5LH7AB8fmfltA",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    }
+  }
+}
