@@ -1,0 +1,24 @@
+src/main/java/io/github/hectorvent/floci/services/cloudformation/CloudFormationTemplateEngine.java
+  s_e4097c3faf643a::t_3d1c05bbc85ceb 229-231
+src/test/java/io/github/hectorvent/floci/services/cloudformation/CloudFormationBootstrapSubIntegrationTest.java
+  s_e4097c3faf643a::t_bb0200231b91ca 1-64
+src/test/java/io/github/hectorvent/floci/services/cloudformation/CloudFormationTemplateEngineTest.java
+  s_e4097c3faf643a::t_3d1c05bbc85ceb 37-54
+  s_e4097c3faf643a::t_7399c14f619560 36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b1c33806cea8afe2e3136d57ee0c31cdcb8a0c6b",
+  "prompts": {},
+  "sessions": {
+    "s_e4097c3faf643a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f6dba6e64ffe64jXo1zDuErGen",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    }
+  }
+}
