@@ -193,7 +193,8 @@ public class RuntimeApiServer {
      */
     protected void beforeSendInvocationWrite(String requestId) { }
 
-    // Set once an extension reports an init/exit error. Real AWS treats both as fatal to the
+    // Set once an extension reports an init/exit error or the runtime reports an init error.
+    // Real AWS treats these as fatal to the
     // execution environment, so the container must neither accept new work nor be reused.
     //
     // Read under `lock` alongside `stopped` in enqueue()/NEXT_PATH — a condemned environment
@@ -204,8 +205,12 @@ public class RuntimeApiServer {
     // Distinct from `stopped`: this does *not* tear the server down. The invocation already
     // in flight when the extension failed still completes normally through the runtime's own
     // /response call, matching AWS's treatment of the environment as condemned for future work
-    // rather than aborted mid-invoke. WarmPool performs the actual teardown afterwards.
+    // rather than aborted mid-invoke. A runtime init error instead settles all outstanding
+    // invocations with its error payload. WarmPool performs the actual teardown afterwards.
     private volatile boolean faulted;
+
+    // First runtime initialization failure, guarded by lock. Reused for late enqueues.
+    private byte[] runtimeInitError;
 
     // Init-readiness barrier. ContainerLauncher launches extension binaries as detached `docker
     // exec`s and returns immediately, so without this the first invocation can reach the runtime
@@ -363,7 +368,7 @@ public class RuntimeApiServer {
                 // ContainerStopped and dispatching now would silently discard /response.
                 boolean alreadyHandled;
                 synchronized (lock) {
-                    alreadyHandled = stopped;
+                    alreadyHandled = stopped || runtimeInitError != null;
                 }
                 if (!alreadyHandled) {
                     sendInvocation(ctx, toDispatch);
@@ -401,6 +406,8 @@ public class RuntimeApiServer {
         // POST /runtime/init/error — runtime initialization failure
         router.post(INIT_ERROR_PATH).handler(ctx -> {
             LOG.warnv("Lambda runtime reported init error on port {0}", String.valueOf(port));
+            byte[] payload = ctx.body().buffer() != null ? ctx.body().buffer().getBytes() : new byte[0];
+            failRuntimeInitialization(payload);
             sendStatusOk(ctx);
         });
 
@@ -772,6 +779,7 @@ public class RuntimeApiServer {
 
     public CompletableFuture<InvokeResult> enqueue(PendingInvocation invocation) {
         boolean rejected;
+        byte[] rejectionPayload;
         RoutingContext waitingCtxForInvocation = null;
 
         synchronized (lock) {
@@ -781,6 +789,7 @@ public class RuntimeApiServer {
             // failing fast. Read inside the lock alongside `stopped` so the accept/reject decision
             // stays a single atomic step.
             rejected = stopped || faulted;
+            rejectionPayload = runtimeInitError != null ? runtimeInitError : CONTAINER_STOPPED_PAYLOAD;
             if (!rejected) {
                 waitingCtxForInvocation = waitingContexts.poll();
                 if (waitingCtxForInvocation == null) {
@@ -796,7 +805,7 @@ public class RuntimeApiServer {
 
         if (rejected) {
             invocation.getResultFuture().complete(
-                    new InvokeResult(200, "Unhandled", CONTAINER_STOPPED_PAYLOAD, null, invocation.getRequestId()));
+                    new InvokeResult(200, "Unhandled", rejectionPayload, null, invocation.getRequestId()));
             return invocation.getResultFuture();
         }
 
@@ -821,7 +830,7 @@ public class RuntimeApiServer {
                 // saw ended → no send; neither branch fired.
                 boolean shouldDispatch;
                 synchronized (lock) {
-                    if (stopped) {
+                    if (stopped || runtimeInitError != null) {
                         return;
                     }
                     if (waitingCtx.response().ended()) {
@@ -901,13 +910,53 @@ public class RuntimeApiServer {
             // Skip if quiesce() beat us — it already swept inFlight and settled the
             // future with ContainerStopped.
             synchronized (lock) {
-                if (stopped) {
+                if (stopped || runtimeInitError != null) {
                     return;
                 }
                 pendingQueue.offer(invocation);
                 inFlight.remove(invocation.getRequestId());
             }
         });
+    }
+
+    private void failRuntimeInitialization(byte[] payload) {
+        List<PendingInvocation> invocations;
+        List<RoutingContext> runtimePollers;
+        List<RoutingContext> extensionPollers = new ArrayList<>();
+        synchronized (lock) {
+            if (stopped || runtimeInitError != null) {
+                return;
+            }
+            runtimeInitError = payload;
+            faulted = true;
+            invocations = new ArrayList<>(pendingQueue);
+            pendingQueue.clear();
+            invocations.addAll(inFlight.values());
+            inFlight.clear();
+            runtimePollers = new ArrayList<>(waitingContexts);
+            waitingContexts.clear();
+            for (RegisteredExtension extension : extensions.values()) {
+                RoutingContext poller = extension.takeWaitingContext();
+                if (poller != null) {
+                    extensionPollers.add(poller);
+                }
+            }
+        }
+        // Future callbacks may retire the container. Complete outside the bookkeeping lock.
+        for (PendingInvocation invocation : invocations) {
+            invocation.getResultFuture().complete(
+                    new InvokeResult(200, "Unhandled", payload, null, invocation.getRequestId()));
+        }
+        for (RoutingContext poller : runtimePollers) {
+            if (!poller.response().ended()) {
+                poller.response().setStatusCode(204).end();
+            }
+        }
+        for (RoutingContext poller : extensionPollers) {
+            if (!poller.response().ended()) {
+                sendExtensionFaulted(poller);
+            }
+        }
     }
 
     private Future<Void> sendExtensionEvent(RoutingContext ctx, ExtensionEvent event) {

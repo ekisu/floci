@@ -37,6 +37,130 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RuntimeApiServerTest {
 
+    private static final String INIT_FAILURE = "{\"errorMessage\":\"no bootstrap found at /var/task/bootstrap or /opt/bootstrap\","
+            + "\"errorType\":\"Runtime.InvalidEntrypoint\"}";
+
+    private PendingInvocation initInvocation(String id) {
+        return new PendingInvocation(id, "{}".getBytes(), System.currentTimeMillis() + 60_000,
+                "arn:aws:lambda:us-east-1:000000000000:function:custom", new CompletableFuture<>());
+    }
+
+    private void reportInitFailure(String payload) throws Exception {
+        HttpResponse<String> response = httpClient.send(HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + "/2018-06-01/runtime/init/error"))
+                .header("Lambda-Runtime-Function-Error-Type", "Runtime.InvalidEntrypoint")
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload)).build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(202, response.statusCode());
+    }
+
+    private void assertInitFailure(PendingInvocation invocation) throws Exception {
+        InvokeResult result = invocation.getResultFuture().get(2, TimeUnit.SECONDS);
+        assertEquals("Unhandled", result.getFunctionError());
+        assertEquals(INIT_FAILURE, new String(result.getPayload()));
+        assertEquals(0, server.pendingQueueSize());
+        assertEquals(0, server.inFlightSize());
+        assertTrue(server.isFaulted());
+    }
+
+    @Test
+    @Timeout(10)
+    void runtimeInitErrorBeforeEnqueueRejectsLaterInvocationsWithOriginalPayload() throws Exception {
+        reportInitFailure(INIT_FAILURE);
+        reportInitFailure("{\"errorType\":\"different\"}");
+        PendingInvocation invocation = initInvocation("late-init");
+        server.enqueue(invocation);
+        assertInitFailure(invocation);
+        server.quiesce();
+        PendingInvocation afterStop = initInvocation("after-stop-init");
+        server.enqueue(afterStop);
+        assertInitFailure(afterStop);
+    }
+
+    @Test
+    @Timeout(10)
+    void runtimeInitErrorDrainsQueuedAndInFlightInvocations() throws Exception {
+        PendingInvocation dispatched = initInvocation("inflight-init");
+        server.enqueue(dispatched);
+        HttpResponse<String> next = httpClient.send(HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + "/2018-06-01/runtime/invocation/next"))
+                .GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, next.statusCode());
+        assertEquals(1, server.inFlightSize());
+        PendingInvocation queued = initInvocation("queued-init");
+        server.enqueue(queued);
+        reportInitFailure(INIT_FAILURE);
+        assertInitFailure(dispatched);
+        assertInitFailure(queued);
+    }
+
+    @Test
+    @Timeout(10)
+    void runtimeInitErrorDrainsCancelledAndTimedOutInvocationsWithoutOverwritingTheirResults() throws Exception {
+        PendingInvocation cancelled = initInvocation("cancelled-init");
+        PendingInvocation timedOut = initInvocation("timeout-init");
+        server.enqueue(cancelled);
+        server.enqueue(timedOut);
+        cancelled.getResultFuture().cancel(false);
+        timedOut.getResultFuture().completeExceptionally(new java.util.concurrent.TimeoutException("deadline"));
+        reportInitFailure(INIT_FAILURE);
+        assertTrue(cancelled.getResultFuture().isCancelled());
+        assertTrue(timedOut.getResultFuture().isCompletedExceptionally());
+        assertEquals(0, server.pendingQueueSize());
+        assertEquals(0, server.inFlightSize());
+        PendingInvocation next = initInvocation("after-timeout-init");
+        server.enqueue(next);
+        assertInitFailure(next);
+    }
+
+    @Test
+    @Timeout(10)
+    void runtimeInitErrorReleasesParkedRuntimePollers() throws Exception {
+        CompletableFuture<HttpResponse<String>> next = httpClient.sendAsync(HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + "/2018-06-01/runtime/invocation/next"))
+                .GET().build(), HttpResponse.BodyHandlers.ofString());
+        awaitWaitingContexts(1);
+        reportInitFailure(INIT_FAILURE);
+        assertEquals(204, next.get(2, TimeUnit.SECONDS).statusCode());
+        assertEquals(0, server.waitingContextsSize());
+    }
+
+    @Test
+    @Timeout(10)
+    void runtimeInitErrorRacingEnqueueNeverLeavesUnresolvedWork() throws Exception {
+        List<PendingInvocation> invocations = new ArrayList<>();
+        for (int index = 0; index < 32; index++) {
+            invocations.add(initInvocation("racing-init-" + index));
+        }
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            var enqueue = executor.submit(() -> {
+                start.await();
+                invocations.forEach(server::enqueue);
+                return null;
+            });
+            start.countDown();
+            reportInitFailure(INIT_FAILURE);
+            enqueue.get(2, TimeUnit.SECONDS);
+        }
+        for (PendingInvocation invocation : invocations) {
+            assertInitFailure(invocation);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void runtimeInitErrorReleasesParkedExtensionPollers() throws Exception {
+        String extension = registerExtension("init-error-extension", "INVOKE", "SHUTDOWN");
+        CompletableFuture<HttpResponse<String>> next = httpClient.sendAsync(HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + "/2020-01-01/extension/event/next"))
+                .header("Lambda-Extension-Identifier", extension).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertTrue(awaitExtensionParked(server, extension, 2000));
+        reportInitFailure(INIT_FAILURE);
+        assertEquals(500, next.get(2, TimeUnit.SECONDS).statusCode());
+        assertFalse(server.isExtensionParked(extension));
+    }
+
     private Vertx vertx;
     private RuntimeApiServer server;
     private int port;
