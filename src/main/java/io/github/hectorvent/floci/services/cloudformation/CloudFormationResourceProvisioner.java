@@ -2524,7 +2524,7 @@ public class CloudFormationResourceProvisioner {
                     : generatePhysicalName(stackName, r.getLogicalId(), 128, false);
         }
         String document = props != null && props.has("PolicyDocument")
-                ? props.get("PolicyDocument").toString()
+                ? engine.resolveJsonAttribute(props.get("PolicyDocument"))
                 : "{\"Version\":\"2012-10-17\",\"Statement\":[]}";
 
         final String name = policyName;
@@ -2683,7 +2683,7 @@ public class CloudFormationResourceProvisioner {
             policyName = generatePhysicalName(stackName, r.getLogicalId(), 128, false);
         }
         String document = props != null && props.has("PolicyDocument")
-                ? props.get("PolicyDocument").toString()
+                ? engine.resolveJsonAttribute(props.get("PolicyDocument"))
                 : "{\"Version\":\"2012-10-17\",\"Statement\":[]}";
         List<String> roleNames = resolveStringList(props, "Roles", engine);
         String existingArn = r.getPhysicalId();
