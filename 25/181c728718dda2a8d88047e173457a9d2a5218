@@ -1,0 +1,83 @@
+src/main/java/io/github/hectorvent/floci/services/cloudformation/model/Stack.java
+  s_579811a151f672::t_e1d66d29f301d8 14-20
+src/main/java/io/github/hectorvent/floci/config/EmulatorConfig.java
+  s_dc0fed9df01da3::t_ed38e2f9c369f0 1944-1947
+  s_dc0fed9df01da3::t_fd767827317b72 2496-2499
+src/main/java/io/github/hectorvent/floci/services/lambda/launcher/ImageCacheService.java
+  s_dc0fed9df01da3::t_fd767827317b72 35,45,73-78,165
+docs/services/cloudformation-deterministic-lambda-names.md
+  s_579811a151f672::t_06368b83626f5a 1-42
+src/test/java/io/github/hectorvent/floci/services/lambda/launcher/ImageResolverTest.java
+  s_dc0fed9df01da3::t_d6246533ca4a79 14-15,50-65
+  s_dc0fed9df01da3::t_b4627f0df3084b 16-49
+src/main/java/io/github/hectorvent/floci/services/cloudformation/CloudFormationResourceProvisioner.java
+  s_579811a151f672::t_e1d66d29f301d8 1847,1873-1879,1934-1943
+  s_579811a151f672::t_4467b33a64dec4 1848,1855-1871
+src/main/java/io/github/hectorvent/floci/services/lambda/launcher/ImageResolver.java
+  s_dc0fed9df01da3::t_fd767827317b72 29-30
+  s_dc0fed9df01da3::t_ed38e2f9c369f0 50,54-58,62-65,78-85
+src/main/java/io/github/hectorvent/floci/services/cloudformation/CloudFormationService.java
+  s_579811a151f672::t_e1d66d29f301d8 1141,2241-2242
+  s_579811a151f672::t_f38dd6f6102f6a 2236-2240,2252
+src/test/java/io/github/hectorvent/floci/services/lambda/launcher/ImageCacheServiceTest.java
+  s_dc0fed9df01da3::t_d6246533ca4a79 17-19,41-111,414-417,425
+src/main/resources/application.yml
+  s_579811a151f672::t_f38dd6f6102f6a 102-103
+  s_dc0fed9df01da3::t_fd767827317b72 244
+  s_dc0fed9df01da3::t_ed38e2f9c369f0 279
+src/test/java/io/github/hectorvent/floci/services/cloudformation/LambdaNameReservationIntegrationTest.java
+  s_579811a151f672::t_06368b83626f5a 1-45
+docs/services/lambda.md
+  s_dc0fed9df01da3::t_357e2129f7f4e5 58-81,100-103
+  s_dc0fed9df01da3::t_b4627f0df3084b 82-99
+src/main/java/io/github/hectorvent/floci/services/cloudformation/CloudFormationTemplateEngine.java
+  s_579811a151f672::t_e1d66d29f301d8 31-40
+src/main/java/io/github/hectorvent/floci/config/CloudFormationNamingConfig.java
+  s_579811a151f672::t_bf777715046cc4 1-10
+src/main/java/io/github/hectorvent/floci/services/cloudformation/LambdaNameReservationController.java
+  s_579811a151f672::t_e1d66d29f301d8 1-2,5-17,25-31,33-39
+  s_579811a151f672::t_98a05a4b5231b2 3-4,18-24,32
+src/test/java/io/github/hectorvent/floci/services/cloudformation/DeterministicLambdaNamesServiceTest.java
+  s_579811a151f672::t_837e09e3bbf6e7 72-73
+  s_579811a151f672::t_14b235d70897b6 74-83
+  s_579811a151f672::t_98a05a4b5231b2 51
+  s_579811a151f672::t_bf777715046cc4 1-50,52-71,84-101
+src/test/java/io/github/hectorvent/floci/services/lambda/LambdaImageConfigTest.java
+  s_dc0fed9df01da3::t_a8d430ffccdfb4 29-31,381-391,393-409
+  s_dc0fed9df01da3::t_c01a65e04ec818 392
+  s_dc0fed9df01da3::t_065763c08cc3a7 261
+  s_dc0fed9df01da3::t_9bfd89e84cc8aa 410
+src/main/java/io/github/hectorvent/floci/services/lambda/launcher/ContainerLauncher.java
+  s_dc0fed9df01da3::t_ed38e2f9c369f0 197,502-509
+  s_dc0fed9df01da3::t_f4a73c0546a5ae 510-511
+src/main/java/io/github/hectorvent/floci/services/cloudformation/DeterministicLambdaNames.java
+  s_579811a151f672::t_e1d66d29f301d8 1-48
+src/test/resources/application.yml
+  s_579811a151f672::t_f38dd6f6102f6a 16-17
+  s_dc0fed9df01da3::t_fd767827317b72 112
+  s_dc0fed9df01da3::t_ed38e2f9c369f0 135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "25181c728718dda2a8d88047e173457a9d2a5218",
+  "prompts": {},
+  "sessions": {
+    "s_579811a151f672": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f6d073268ffecu30tO17BVU5iX",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    },
+    "s_dc0fed9df01da3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f6d0765dbffe3pu0itSkSJ3Ovj",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    }
+  }
+}
