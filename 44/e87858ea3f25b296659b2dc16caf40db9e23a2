@@ -1,0 +1,22 @@
+src/main/java/io/github/hectorvent/floci/services/cloudformation/CloudFormationResourceProvisioner.java
+  s_579811a151f672::t_2c509afcf7a638 2527,2686
+src/test/java/io/github/hectorvent/floci/services/cloudformation/CloudFormationIamPolicyIntrinsicsIntegrationTest.java
+  s_579811a151f672::t_fed970740916c1 40,90
+  s_579811a151f672::t_9c23b7b0627693 1-39,41-89,91-107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "44e87858ea3f25b296659b2dc16caf40db9e23a2",
+  "prompts": {},
+  "sessions": {
+    "s_579811a151f672": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f6d073268ffecu30tO17BVU5iX",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    }
+  }
+}
