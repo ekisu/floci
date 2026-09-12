@@ -481,6 +481,7 @@ floci:
       registry-image: "registry:2"
       registry-container-name: floci-ecr-registry
       registry-base-port: 5100
+      disable-host-port-publication: ${FLOCI_SERVICES_ECR_DISABLE_HOST_PORT_PUBLICATION:false}
       registry-max-port: 5199
       data-path: ./data/ecr
       tls-enabled: false

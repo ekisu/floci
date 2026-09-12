@@ -117,12 +117,75 @@ class EcrRegistryManagerTest {
                 new ContainerLifecycleManager.ContainerInfo("container-id", Map.of()));
 
         manager.ensureStarted();
+        verify(builder).withPortBinding(5000, BASE_PORT);
 
         verify(builder).withLabels(Map.of(
                 "io.floci", "aws",
                 "io.floci.service", "ecr",
                 "io.floci.account", "000000000000",
                 "io.floci.region", "us-east-1"));
+    }
+
+    @Test
+    void privateRegistryHasNoHostBindingAndUsesNamespacedInternalEndpoint() {
+        when(ecr.disableHostPortPublication()).thenReturn(true);
+        when(ecr.dockerNetwork()).thenReturn(Optional.of("private-network"));
+        when(docker.resourceNamespace()).thenReturn(Optional.of("private-owner"));
+        when(lifecycleManager.createAndStart(any())).thenReturn(
+                new ContainerLifecycleManager.ContainerInfo("private-container", Map.of()));
+        manager.ensureStarted();
+        verify(builder, Mockito.never()).withPortBinding(Mockito.anyInt(), Mockito.anyInt());
+        verify(builder).withDockerNetwork(Optional.of("private-network"));
+        assertTrue(manager.getProxyEndpoint().contains("private-owner"));
+        assertTrue(manager.getProxyEndpoint().endsWith(":5000"));
+        assertEquals(manager.internalEndpoint(), manager.getProxyEndpoint());
+        assertEquals(manager.internalEndpoint().substring(7) + "/000000000000/us-east-1/repo",
+                manager.getRepositoryUri("000000000000", "us-east-1", "repo"));
+    }
+
+    @Test
+    void privateRegistryRejectsPublishedContainerBeforeAdoption() {
+        when(ecr.disableHostPortPublication()).thenReturn(true);
+        var existing = Mockito.mock(com.github.dockerjava.api.model.Container.class);
+        when(existing.getId()).thenReturn("published");
+        when(lifecycleManager.findByName(anyString())).thenReturn(Optional.of(existing));
+        var command = Mockito.mock(com.github.dockerjava.api.command.InspectContainerCmd.class);
+        var inspection = Mockito.mock(com.github.dockerjava.api.command.InspectContainerResponse.class);
+        when(dockerClient.inspectContainerCmd("published")).thenReturn(command);
+        when(command.exec()).thenReturn(inspection);
+        var bindings = new com.github.dockerjava.api.model.Ports();
+        bindings.bind(com.github.dockerjava.api.model.ExposedPort.tcp(5000),
+                com.github.dockerjava.api.model.Ports.Binding.bindPort(5100));
+        when(inspection.getHostConfig()).thenReturn(
+                com.github.dockerjava.api.model.HostConfig.newHostConfig().withPortBindings(bindings));
+        assertThrows(IllegalStateException.class, manager::ensureStarted);
+        assertFalse(manager.isStarted());
+        verify(lifecycleManager, Mockito.never()).adopt(anyString(), Mockito.anyList());
+    }
+
+    @Test
+    void privateRegistryAdoptsUnpublishedContainerOnItsNetwork() {
+        when(ecr.disableHostPortPublication()).thenReturn(true);
+        when(ecr.dockerNetwork()).thenReturn(Optional.of("private-network"));
+        var existing = Mockito.mock(com.github.dockerjava.api.model.Container.class);
+        when(existing.getId()).thenReturn("private-container");
+        when(lifecycleManager.findByName(anyString())).thenReturn(Optional.of(existing));
+        var command = Mockito.mock(com.github.dockerjava.api.command.InspectContainerCmd.class);
+        var inspection = Mockito.mock(com.github.dockerjava.api.command.InspectContainerResponse.class,
+                Mockito.RETURNS_DEEP_STUBS);
+        when(dockerClient.inspectContainerCmd("private-container")).thenReturn(command);
+        when(command.exec()).thenReturn(inspection);
+        when(inspection.getHostConfig()).thenReturn(
+                com.github.dockerjava.api.model.HostConfig.newHostConfig().withNetworkMode("private-network"));
+        when(inspection.getNetworkSettings().getNetworks()).thenReturn(
+                Map.of("private-network", new com.github.dockerjava.api.model.ContainerNetwork()));
+        when(lifecycleManager.adopt("private-container", List.of(5000))).thenReturn(
+                new ContainerLifecycleManager.ContainerInfo("private-container", Map.of()));
+        manager.ensureStarted();
+        assertTrue(manager.isStarted());
+        assertEquals(5000, manager.effectivePort());
+        assertEquals(manager.internalEndpoint(), manager.getProxyEndpoint());
+        verify(lifecycleManager, Mockito.never()).createAndStart(any());
     }
 
     @Test

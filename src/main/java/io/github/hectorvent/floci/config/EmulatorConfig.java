@@ -1899,6 +1899,9 @@ public interface EmulatorConfig {
         @WithDefault("5100")
         int registryBasePort();
 
+        @WithDefault("false")
+        boolean disableHostPortPublication();
+
         @WithDefault("5199")
         int registryMaxPort();
 

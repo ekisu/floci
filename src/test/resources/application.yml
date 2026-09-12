@@ -271,6 +271,7 @@ floci:
     appconfigdata:
       enabled: true
     ecr:
+      disable-host-port-publication: false
       enabled: true
     ui:
       enabled: true

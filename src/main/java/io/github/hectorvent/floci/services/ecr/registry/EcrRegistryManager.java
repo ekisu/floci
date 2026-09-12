@@ -141,6 +141,10 @@ public class EcrRegistryManager {
 
     /** Returns the docker-pullable repository URI for the given account/region/name. */
     public String getRepositoryUri(String accountId, String region, String repoName) {
+        if (config.services().ecr().disableHostPortPublication()) {
+            return registryContainerName() + ":" + CONTAINER_INTERNAL_PORT + "/"
+                    + internalRepoName(accountId, region, repoName);
+        }
         int port = effectivePort();
         String style = config.services().ecr().uriStyle();
         if ("path".equalsIgnoreCase(style)) {
@@ -151,13 +155,16 @@ public class EcrRegistryManager {
 
     /** Returns the proxy endpoint a docker daemon should log into for any ECR repo. */
     public String getProxyEndpoint() {
+        if (config.services().ecr().disableHostPortPublication()) {
+            return internalEndpoint();
+        }
         String scheme = config.services().ecr().tlsEnabled() ? "https" : "http";
         return scheme + "://localhost:" + effectivePort();
     }
 
     /** Returns the effective registry port. Stable across calls once {@link #ensureStarted} runs. */
     public int effectivePort() {
-        return hostPort;
+        return config.services().ecr().disableHostPortPublication() ? CONTAINER_INTERNAL_PORT : hostPort;
     }
 
     /** Internal namespace prefix used to isolate cross-account/region repos within the shared registry. */
@@ -175,7 +182,7 @@ public class EcrRegistryManager {
 
     /** Returns a {@link RegistryHttpClient} bound to the current registry endpoint. */
     public RegistryHttpClient httpClient() {
-        if (containerDetector.isRunningInContainer()) {
+        if (config.services().ecr().disableHostPortPublication() || containerDetector.isRunningInContainer()) {
             return new RegistryHttpClient(internalEndpoint());
         }
         return new RegistryHttpClient("http://localhost:" + effectivePort());
@@ -239,7 +246,12 @@ public class EcrRegistryManager {
         }
 
         // Allocate port
-        int chosenPort = portAllocator.allocate(
+        boolean privateRegistry = config.services().ecr().disableHostPortPublication();
+        var network = resolveRegistryDockerNetwork();
+        if (privateRegistry && (network.isEmpty() || "host".equals(network.get()) || "bridge".equals(network.get()))) {
+            throw new IllegalStateException("Private ECR registry requires a user-defined Docker network");
+        }
+        int chosenPort = privateRegistry ? CONTAINER_INTERNAL_PORT : portAllocator.allocate(
                 config.services().ecr().registryBasePort(),
                 config.services().ecr().registryMaxPort());
 
@@ -256,11 +268,13 @@ public class EcrRegistryManager {
             ContainerBuilder.Builder specBuilder = containerBuilder.newContainer(image)
                     .withName(name)
                     .withEnv(env)
-                    .withPortBinding(CONTAINER_INTERNAL_PORT, chosenPort)
-                    .withDockerNetwork(resolveRegistryDockerNetwork())
+                    .withDockerNetwork(network)
                     .withLogRotation()
                     .withLabels(ContainerStorageHelper.resourceIdentityLabels(
                             "ecr", null, regionResolver.getAccountId(), regionResolver.getDefaultRegion()));
+            if (!privateRegistry) {
+                specBuilder.withPortBinding(CONTAINER_INTERNAL_PORT, chosenPort);
+            }
 
             // Handle persistence mounting based on storage configuration
             addPersistenceMounts(specBuilder, env);
@@ -279,7 +293,7 @@ public class EcrRegistryManager {
             // Release the reserved port unless the container actually started, so a
             // failed start (e.g. Docker unreachable) does not permanently exhaust the
             // registry port pool across retries.
-            if (!started) {
+            if (!started && !privateRegistry) {
                 portAllocator.release(chosenPort);
             }
             throw new RuntimeException("Failed to start ECR backing registry container: " + e.getMessage(), e);
@@ -488,7 +502,9 @@ public class EcrRegistryManager {
             return;
         }
         lifecycleManager.stopAndRemove(containerId, logStream);
-        portAllocator.release(hostPort);
+        if (!config.services().ecr().disableHostPortPublication()) {
+            portAllocator.release(hostPort);
+        }
         containerId = null;
         logStream = null;
         started = false;
@@ -518,6 +534,21 @@ public class EcrRegistryManager {
     }
 
     private void adoptExisting(Container existing) {
+        if (config.services().ecr().disableHostPortPublication()) {
+            var inspection = lifecycleManager.getDockerClient().inspectContainerCmd(existing.getId()).exec();
+            var host = inspection.getHostConfig();
+            if (host == null || Boolean.TRUE.equals(host.getPublishAllPorts())
+                    || (host.getPortBindings() != null && !host.getPortBindings().getBindings().isEmpty())
+                    || "host".equals(host.getNetworkMode())) {
+                throw new IllegalStateException("Refusing to adopt ECR registry with host port publication");
+            }
+            var network = resolveRegistryDockerNetwork();
+            if (network.isEmpty() || inspection.getNetworkSettings() == null
+                    || inspection.getNetworkSettings().getNetworks() == null
+                    || !inspection.getNetworkSettings().getNetworks().keySet().equals(java.util.Set.of(network.get()))) {
+                throw new IllegalStateException("Refusing to adopt ECR registry outside its configured private network");
+            }
+        }
         this.containerId = existing.getId();
         try {
             ContainerInfo info = lifecycleManager.adopt(containerId, List.of(CONTAINER_INTERNAL_PORT));
@@ -525,7 +556,9 @@ public class EcrRegistryManager {
             // daemon, so hostPort must be the published binding — adopt's endpoint
             // resolves to the container-internal port when Floci runs inside Docker.
             var published = info.publishedHostPort(CONTAINER_INTERNAL_PORT);
-            if (published.isPresent()) {
+            if (config.services().ecr().disableHostPortPublication()) {
+                this.hostPort = CONTAINER_INTERNAL_PORT;
+            } else if (published.isPresent()) {
                 this.hostPort = published.getAsInt();
             } else {
                 LOG.warnv("Adopted ECR registry container {0} has no published binding for port {1}; keeping configured port {2}",
