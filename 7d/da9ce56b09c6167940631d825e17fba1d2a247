@@ -1,0 +1,24 @@
+src/main/java/io/github/hectorvent/floci/services/lambda/runtime/RuntimeApiServer.java
+  s_dc0fed9df01da3::t_71bc413335e4b5 212-214,371,409-410,782,792,808,833,913,922-959
+  s_dc0fed9df01da3::t_582890093ca640 196-197,208-209
+  s_dc0fed9df01da3::t_3f061742dc54ea 960-961
+src/test/java/io/github/hectorvent/floci/services/lambda/runtime/RuntimeApiServerTest.java
+  s_dc0fed9df01da3::t_f7e381867beece 40-127
+  s_dc0fed9df01da3::t_22c96c5cbfff18 128-163
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7dda9ce56b09c6167940631d825e17fba1d2a247",
+  "prompts": {},
+  "sessions": {
+    "s_dc0fed9df01da3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f6d0765dbffe3pu0itSkSJ3Ovj",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    }
+  }
+}
