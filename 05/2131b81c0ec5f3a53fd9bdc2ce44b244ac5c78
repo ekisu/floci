@@ -1,0 +1,22 @@
+src/main/java/io/github/hectorvent/floci/services/lambda/LambdaService.java
+  s_dc0fed9df01da3::t_c98cd763c168ef 2776-2782
+src/test/java/io/github/hectorvent/floci/services/lambda/LambdaServiceTest.java
+  s_dc0fed9df01da3::t_c98cd763c168ef 16-17,463-520
+  s_dc0fed9df01da3::t_c12424b18d7170 521
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "052131b81c0ec5f3a53fd9bdc2ce44b244ac5c78",
+  "prompts": {},
+  "sessions": {
+    "s_dc0fed9df01da3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f6d0765dbffe3pu0itSkSJ3Ovj",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    }
+  }
+}
