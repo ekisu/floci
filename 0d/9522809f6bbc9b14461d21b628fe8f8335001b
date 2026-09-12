@@ -1,0 +1,30 @@
+src/main/java/io/github/hectorvent/floci/services/ecr/registry/EcrRegistryManager.java
+  s_579811a151f672::t_b79e520f8ca802 144-147,158-160,167,185,249-254,271,275-277,296,505-507,537-544,551
+  s_579811a151f672::t_016fcabc0bbc4e 545-550,559-561
+src/test/java/io/github/hectorvent/floci/services/ecr/registry/EcrRegistryManagerTest.java
+  s_579811a151f672::t_ccf16f56d05216 164,167-190
+  s_579811a151f672::t_74550d5f172704 120,129-163,166
+  s_579811a151f672::t_f92fab6eb7a156 165
+src/main/java/io/github/hectorvent/floci/config/EmulatorConfig.java
+  s_579811a151f672::t_b79e520f8ca802 1902-1904
+src/main/resources/application.yml
+  s_579811a151f672::t_b79e520f8ca802 484
+src/test/resources/application.yml
+  s_579811a151f672::t_35cbbaa24ddb39 274
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0d9522809f6bbc9b14461d21b628fe8f8335001b",
+  "prompts": {},
+  "sessions": {
+    "s_579811a151f672": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f6d073268ffecu30tO17BVU5iX",
+        "model": "unknown"
+      },
+      "human_author": "Ramon Dantas <ramon.dantas@facio.com>"
+    }
+  }
+}
