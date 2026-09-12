@@ -13,6 +13,8 @@ import io.github.hectorvent.floci.services.lambda.zip.CodeStore;
 import io.github.hectorvent.floci.services.lambda.zip.ZipExtractor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -456,6 +458,65 @@ class LambdaServiceTest {
         AwsException ex = assertThrows(AwsException.class, () -> service.createFunction(REGION, req));
         assertEquals("InvalidParameterValueException", ex.getErrorCode());
         assertTrue(ex.getMessage().contains("Handler"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"provided", "provided.al2", "provided.al2023"})
+    void providedRuntimeAcceptsBootstrapWithNativeHandlerOnCreateAndUpdate(String runtime) throws Exception {
+        Map<String, Object> request = baseRequest("custom-bootstrap-" + runtime);
+        request.put("Runtime", runtime);
+        request.put("Handler", "main");
+        request.put("Code", Map.of("ZipFile", createZipBase64("bootstrap")));
+
+        LambdaFunction fn = service.createFunction(REGION, request);
+        assertEquals(runtime, fn.getRuntime());
+        assertEquals("main", fn.getHandler());
+        assertTrue(Files.isRegularFile(Path.of(fn.getCodeLocalPath()).resolve("bootstrap")));
+
+        LambdaFunction updated = service.updateFunctionCode(REGION, fn.getFunctionName(),
+                Map.of("ZipFile", createZipBase64("bootstrap", "config.json")));
+        assertEquals("main", updated.getHandler());
+        assertTrue(Files.isRegularFile(Path.of(updated.getCodeLocalPath()).resolve("bootstrap")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"provided.al2", "provided.al2023"})
+    void providedRuntimeDefersLayerBootstrapResolutionUntilInvocation(String runtime) throws Exception {
+        String layer = "arn:aws:lambda:us-east-1:000000000000:layer:custom-bootstrap:1";
+        Map<String, Object> request = baseRequest("layer-bootstrap-" + runtime);
+        request.put("Runtime", runtime);
+        request.put("Handler", "main");
+        request.put("Layers", List.of(layer));
+        request.put("Code", Map.of("ZipFile", createZipBase64("config.json")));
+
+        LambdaFunction fn = service.createFunction(REGION, request);
+        assertEquals(List.of(layer), fn.getLayers());
+        assertEquals("main", fn.getHandler());
+        assertFalse(Files.exists(Path.of(fn.getCodeLocalPath()).resolve("bootstrap")));
+    }
+
+    @Test
+    void missingCustomRuntimeBootstrapIsAnInvocationTimeConcern() throws Exception {
+        Map<String, Object> request = baseRequest("missing-custom-bootstrap");
+        request.put("Runtime", "provided.al2023");
+        request.put("Handler", "main");
+        request.put("Code", Map.of("ZipFile", createZipBase64("config.json")));
+
+        assertEquals("Active", service.createFunction(REGION, request).getState());
+    }
+
+    @Test
+    void goManagedRuntimeStillRequiresMainHandlerExecutable() throws Exception {
+        Map<String, Object> request = baseRequest("go-managed-handler");
+        request.put("Runtime", "go1.x");
+        request.put("Handler", "main");
+        request.put("Code", Map.of("ZipFile", createZipBase64("bootstrap")));
+        AwsException missing = assertThrows(AwsException.class, () -> service.createFunction(REGION, request));
+        assertTrue(missing.getMessage().contains("Handler file 'main' not found"));
+
+        request.put("FunctionName", "go-managed-valid");
+        request.put("Code", Map.of("ZipFile", createZipBase64("main")));
+        assertEquals("main", service.createFunction(REGION, request).getHandler());
     }
 
     private static String createZipBase64(String... entryPaths) throws Exception {

@@ -2773,8 +2773,13 @@ public class LambdaService implements ResourceProvider {
                 }
             }
 
-            // For file-based runtimes, verify handler file exists (skip Java and .NET which use different handler formats)
-            if (fn.getRuntime() != null && !fn.getRuntime().startsWith("java") && !fn.getRuntime().startsWith("dotnet")) {
+            // Custom runtimes locate executable bootstrap in /var/task or a layer's /opt at invocation.
+            // Their Handler is passed as _HANDLER, not interpreted as a deployment-package filename.
+            // Java and .NET also use different handler formats.
+            boolean providedRuntime = "provided".equals(fn.getRuntime())
+                    || "provided.al2".equals(fn.getRuntime()) || "provided.al2023".equals(fn.getRuntime());
+            if (fn.getRuntime() != null && !providedRuntime
+                    && !fn.getRuntime().startsWith("java") && !fn.getRuntime().startsWith("dotnet")) {
                 String handlerFile = resolveHandlerFilePath(fn);
                 boolean pythonRuntime = fn.getRuntime().startsWith("python");
                 boolean found;
