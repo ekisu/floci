@@ -26,6 +26,8 @@ public class ImageResolver {
             Map.entry("python3.11", "python:3.11"),
             Map.entry("python3.10", "python:3.10"),
             Map.entry("python3.9", "python:3.9"),
+            Map.entry("python3.8", "python:3.8"),
+            Map.entry("python3.7", "python:3.7"),
             Map.entry("nodejs24.x", "nodejs:24"),
             Map.entry("nodejs22.x", "nodejs:22"),
             Map.entry("nodejs20.x", "nodejs:20"),
@@ -45,12 +47,22 @@ public class ImageResolver {
     );
 
     private final String baseUri;
+    private final boolean architectureQualifiedImages;
 
     public ImageResolver(EmulatorConfig config) {
         this.baseUri = config.services().lambda().ecrBaseUri();
+        this.architectureQualifiedImages = config.services().lambda().architectureQualifiedImages();
+        if (architectureQualifiedImages && !config.services().lambda().honourArchitectures()) {
+            throw new IllegalArgumentException("floci.services.lambda.architecture-qualified-images requires "
+                    + "floci.services.lambda.honour-architectures=true");
+        }
     }
 
     public String resolve(String runtime) {
+        return resolve(runtime, null);
+    }
+
+    public String resolve(String runtime, String architecture) {
         if (runtime == null || runtime.isBlank()) {
             throw new AwsException("InvalidParameterValueException", "Runtime is required", 400);
         }
@@ -62,6 +74,14 @@ public class ImageResolver {
         if (image == null) {
             throw new AwsException("InvalidParameterValueException",
                     "The runtime parameter " + runtime + " is not supported.", 400);
+        }
+        if (architectureQualifiedImages) {
+            String nativeArchitecture = architecture == null ? "x86_64" : architecture;
+            if (!nativeArchitecture.equals("x86_64") && !nativeArchitecture.equals("arm64")) {
+                throw new AwsException("InvalidParameterValueException",
+                        "Unsupported Lambda architecture: " + nativeArchitecture, 400);
+            }
+            image += "-" + nativeArchitecture;
         }
         return baseUri + "/lambda/" + image;
     }

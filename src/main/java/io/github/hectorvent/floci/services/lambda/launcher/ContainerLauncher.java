@@ -194,7 +194,7 @@ public class ContainerLauncher implements LambdaRuntimeLauncher {
         // Resolve image
         String image = "Image".equals(fn.getPackageType()) && fn.getImageUri() != null
                 ? fn.getImageUri()
-                : imageResolver.resolve(fn.getRuntime());
+                : resolveRuntimeImage(fn);
 
         // If this is an AWS-shaped ECR URI, rewrite it to Floci's loopback registry
         image = ecrRegistryManager.rewriteImageUri(image);
@@ -497,6 +497,16 @@ public class ContainerLauncher implements LambdaRuntimeLauncher {
             case "x86_64" -> Optional.of("linux/amd64");
             default -> Optional.empty();
         };
+    }
+
+    private String resolveRuntimeImage(LambdaFunction fn) {
+        if (!config.services().lambda().architectureQualifiedImages()) {
+            return imageResolver.resolve(fn.getRuntime());
+        }
+        String platform = dockerPlatform(fn).orElseThrow(() -> new IllegalStateException(
+                "Invalid persisted architectures " + fn.getArchitectures()
+                        + " for function '" + fn.getFunctionName() + "'"));
+        return imageResolver.resolve(fn.getRuntime(), platform.equals("linux/arm64") ? "arm64" : "x86_64");
     }
 
     private String createContainer(ContainerSpec spec, LambdaFunction fn) {

@@ -11,6 +11,58 @@ import static org.mockito.Mockito.*;
 
 class ImageResolverTest {
 
+    @ParameterizedTest
+    @CsvSource({
+            "python3.7, x86_64, python:3.7-x86_64",
+            "go1.x, x86_64, go:1-x86_64",
+            "provided.al2023, arm64, provided:al2023-arm64",
+            "provided.al2023, x86_64, provided:al2023-x86_64",
+            "provided.al2023, , provided:al2023-x86_64"
+    })
+    void resolvesArchitectureQualifiedPreparedImages(String runtime, String architecture, String image) {
+        when(config.services().lambda().ecrBaseUri()).thenReturn("facio-sandbox-native-runtime-v1");
+        when(config.services().lambda().architectureQualifiedImages()).thenReturn(true);
+        when(config.services().lambda().honourArchitectures()).thenReturn(true);
+
+        assertEquals("facio-sandbox-native-runtime-v1/lambda/" + image,
+                new ImageResolver(config).resolve(runtime, architecture));
+    }
+
+    @Test
+    void requiresArchitectureSelectionForQualifiedImages() {
+        when(config.services().lambda().architectureQualifiedImages()).thenReturn(true);
+        assertThrows(IllegalArgumentException.class, () -> new ImageResolver(config));
+    }
+
+    @Test
+    void qualifiedImagesRejectUnknownArchitectureAndPreserveCustomUris() {
+        when(config.services().lambda().architectureQualifiedImages()).thenReturn(true);
+        when(config.services().lambda().honourArchitectures()).thenReturn(true);
+        ImageResolver qualified = new ImageResolver(config);
+
+        assertThrows(AwsException.class, () -> qualified.resolve("python3.7", "amd64"));
+        assertEquals("custom/image:tag", qualified.resolve("custom/image:tag", "arm64"));
+        assertEquals("public.ecr.aws/lambda/python:3.7", resolver.resolve("python3.7", "arm64"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "python3.7, python:3.7",
+            "python3.8, python:3.8",
+            "go1.x, go:1",
+            "provided.al2, provided:al2",
+            "provided.al2023, provided:al2023",
+            "nodejs16.x, nodejs:16",
+            "nodejs22.x, nodejs:22"
+    })
+    void resolvesNativeRuntimeToPreparedNamespace(String runtime, String image) {
+        when(config.services().lambda().ecrBaseUri()).thenReturn("prepared.invalid/sandbox-owner");
+
+        assertEquals("prepared.invalid/sandbox-owner/lambda/" + image,
+                new ImageResolver(config).resolve(runtime));
+        assertEquals("public.ecr.aws/lambda/" + image, resolver.resolve(runtime));
+    }
+
     private final EmulatorConfig config = mock(EmulatorConfig.class, RETURNS_DEEP_STUBS);
     private final ImageResolver resolver;
 

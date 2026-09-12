@@ -1138,6 +1138,7 @@ public class CloudFormationService implements ResourceProvider {
                             name -> exports.get(accountExportKey(accountId, exportKey(region, name))));
 
                     StackResource resource = stack.getResources().get(logicalId);
+                    engine.setNamingScope(stack.getNamingRoot(), stack.getNamingPath());
                     StackResource previousResource = resource;
                     if (resource == null) {
                         resource = new StackResource();
@@ -2232,7 +2233,13 @@ public class CloudFormationService implements ResourceProvider {
         String childTemplate = fetchTemplateFromS3(templateUrl);
         String childStackName = parentStack.getStackName() + "-" + logicalId;
 
-        Stack childStack = newStack(childStackName, region, accountId);
+        Stack childStack = !isCreate ? stacks.get(stackKey(accountId, childStackName, region)) : null;
+        boolean childIsCreate = childStack == null;
+        if (childIsCreate) {
+            childStack = newStack(childStackName, region, accountId);
+        }
+        childStack.setNamingRoot(parentStack.getNamingRoot());
+        childStack.setNamingPath(parentStack.getNamingPath() + logicalId + "/");
         childStack.setStatus("CREATE_IN_PROGRESS");
         stacks.put(stackKey(accountId, childStackName, region), childStack);
 
@@ -2242,7 +2249,7 @@ public class CloudFormationService implements ResourceProvider {
                     childParams.put(e.getKey(), engine.resolve(e.getValue())));
         }
 
-        executeTemplate(childStack, childTemplate, childParams, isCreate, region, accountId);
+        executeTemplate(childStack, childTemplate, childParams, childIsCreate, region, accountId);
 
         resource.setPhysicalId(childStack.getStackId());
         resource.getAttributes().put("Arn", childStack.getStackId());

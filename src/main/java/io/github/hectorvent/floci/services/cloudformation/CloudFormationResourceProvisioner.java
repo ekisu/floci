@@ -1844,16 +1844,39 @@ public class CloudFormationResourceProvisioner {
                         "Cannot replace Lambda function " + r.getPhysicalId()
                                 + " without a new FunctionName", 400);
             }
-            func = createLambdaFunction(region, desired, !replacement);
-            if (replacement && r.getPhysicalId() != null) {
+            func = createLambdaFunction(region, desired, !replacement && !DeterministicLambdaNames.enabled());
+            if (replacement && r.getPhysicalId() != null && !DeterministicLambdaNames.enabled()) {
                 deleteReplacedLambda(region, r.getPhysicalId());
             }
         } else {
             func = updateLambdaFunction(region, existing, desired, r);
         }
 
-        applyLambdaReservedConcurrency(region, func, desired);
+        try {
+            applyLambdaReservedConcurrency(region, func, desired);
+        } catch (RuntimeException failure) {
+            if (DeterministicLambdaNames.enabled() && (existing == null || replacement)) {
+                try {
+                    lambdaService.deleteFunction(region, desired.functionName());
+                } catch (RuntimeException cleanupFailure) {
+                    failure.addSuppressed(cleanupFailure);
+                    LOG.warnv("Failed to clean up uncommitted Lambda {0}: {1}",
+                            desired.functionName(), cleanupFailure.getMessage());
+                }
+            }
+            throw failure;
+        }
+        if (DeterministicLambdaNames.enabled() && replacement && r.getPhysicalId() != null) {
+            deleteReplacedLambda(region, r.getPhysicalId());
+        }
 
+        if (DeterministicLambdaNames.enabled()) {
+            long generation = Long.parseLong(r.getAttributes().getOrDefault(DeterministicLambdaNames.GENERATION, "0"));
+            if (r.getPhysicalId() != null && !r.getPhysicalId().equals(desired.functionName())) {
+                generation++;
+            }
+            r.getAttributes().put(DeterministicLambdaNames.GENERATION, Long.toString(generation));
+        }
         r.setPhysicalId(desired.functionName());
         r.getAttributes().put("Arn", func.getFunctionArn());
         r.getAttributes().put(LAMBDA_CODE_IDENTITY_ATTR, desired.code().identity());
@@ -1908,7 +1931,16 @@ public class CloudFormationResourceProvisioner {
         } else if (r.getPhysicalId() != null && !explicitRemoved && !packageTypeReplacement) {
             functionName = r.getPhysicalId();
         } else {
-            functionName = generatePhysicalName(stackName, r.getLogicalId(), 64, false);
+            if (DeterministicLambdaNames.enabled()) {
+                long generation = Long.parseLong(r.getAttributes().getOrDefault(DeterministicLambdaNames.GENERATION, "0"));
+                if (r.getPhysicalId() != null) {
+                    generation++;
+                }
+                functionName = DeterministicLambdaNames.name(accountId, region, engine.namingRoot(),
+                        engine.namingPath(r.getLogicalId()), generation, null);
+            } else {
+                functionName = generatePhysicalName(stackName, r.getLogicalId(), 64, false);
+            }
         }
 
         Map<String, Object> createRequest = new HashMap<>();

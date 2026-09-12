@@ -1941,6 +1941,10 @@ public interface EmulatorConfig {
         @WithDefault("public.ecr.aws")
         String ecrBaseUri();
 
+        /** Append the native AWS architecture to managed runtime image tags. Requires honour-architectures. */
+        @WithDefault("false")
+        boolean architectureQualifiedImages();
+
         @WithDefault("128")
         int defaultMemoryMb();
 
@@ -2489,6 +2493,10 @@ public interface EmulatorConfig {
      * that spawn Docker containers (Lambda, RDS, ElastiCache, ECS, ECR, MSK).
      */
     interface DockerConfig {
+        /** Require locally prepared images matching the requested platform, without registry pulls. */
+        @WithDefault("false")
+        boolean imagePullDisabled();
+
         /**
          * Maximum size of each container log file before rotation.
          * Uses Docker's json-file log driver max-size option format (e.g., "10m", "100k", "1g").

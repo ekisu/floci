@@ -99,6 +99,8 @@ quarkus:
 
 
 floci:
+  cloudformation:
+    deterministic-lambda-names: ${FLOCI_CLOUDFORMATION_DETERMINISTIC_LAMBDA_NAMES:false}
   port: 4566
   base-url: "http://localhost:4566"
   # hostname: ""  # When set, overrides the hostname in response URLs (e.g. SQS QueueUrl).
@@ -239,6 +241,7 @@ floci:
     reject-unknown-service-scope: true # FLOCI_PROTOCOLS_REJECT_UNKNOWN_SERVICE_SCOPE — reject REST requests signed for a service Floci does not implement
 
   docker:
+    image-pull-disabled: false      # FLOCI_DOCKER_IMAGE_PULL_DISABLED; require prepared local images
     log-max-size: "10m"
     log-max-file: "3"
     docker-host: unix:///var/run/docker.sock
@@ -273,6 +276,7 @@ floci:
       ephemeral: false
       ecr-base-uri: public.ecr.aws            # FLOCI_SERVICES_LAMBDA_ECR_BASE_URI — registry for Lambda runtime images (legacy: floci.ecr-base-uri / FLOCI_ECR_BASE_URI)
       honour-architectures: false             # Select the Lambda architecture for Docker pull and create
+      architecture-qualified-images: false  # FLOCI_SERVICES_LAMBDA_ARCHITECTURE_QUALIFIED_IMAGES; requires honour-architectures
       default-memory-mb: 128
       default-timeout-seconds: 3
       # 500 ports, not the former 100 (9200-9299): one port is held per running Lambda

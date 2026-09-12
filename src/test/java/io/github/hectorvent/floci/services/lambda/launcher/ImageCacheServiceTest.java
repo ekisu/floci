@@ -14,6 +14,9 @@ import com.github.dockerjava.api.exception.UnauthorizedException;
 import com.github.dockerjava.api.model.Info;
 import io.github.hectorvent.floci.config.EmulatorConfig;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +37,77 @@ import static org.mockito.Mockito.when;
 class ImageCacheServiceTest {
 
     private static final String IMAGE = "public.ecr.aws/docker/library/alpine:latest";
+
+    @Test
+    void usesPreparedLocalImageWhenPullsAreDisabled() {
+        DockerClient dockerClient = mock(DockerClient.class);
+        InspectImageCmd inspectImage = mock(InspectImageCmd.class);
+        InspectImageResponse image = new InspectImageResponse()
+                .withId("sha256:prepared").withOs("linux").withArch("arm64");
+        when(dockerClient.inspectImageCmd(IMAGE)).thenReturn(inspectImage);
+        when(dockerClient.inspectImageCmd("sha256:prepared")).thenReturn(inspectImage);
+        when(inspectImage.exec()).thenReturn(image);
+
+        ImageCacheService service = newService(dockerClient, true);
+        assertEquals("sha256:prepared", service.ensureImageExists(IMAGE, "linux/arm64"));
+        assertEquals("sha256:prepared", service.ensureImageExists(IMAGE, "linux/arm64"));
+        verify(dockerClient, never()).pullImageCmd(any());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"linux/arm64"})
+    void rejectsMissingLocalImageWithoutPulling(String platform) {
+        DockerClient dockerClient = mock(DockerClient.class);
+        InspectImageCmd inspectImage = mock(InspectImageCmd.class);
+        when(dockerClient.inspectImageCmd(IMAGE)).thenReturn(inspectImage);
+        when(inspectImage.exec()).thenThrow(new NotFoundException("image not found"));
+
+        DockerClientException failure = assertThrows(DockerClientException.class,
+                () -> newService(dockerClient, true).ensureImageExists(IMAGE, platform));
+
+        assertTrue(failure.getMessage().contains("image missing"));
+        assertTrue(failure.getMessage().contains("floci.docker.image-pull-disabled"));
+        assertTrue(failure.getMessage().contains(IMAGE));
+        assertTrue(failure.getMessage().contains(platform == null ? "linux/amd64" : platform));
+        verify(dockerClient, never()).pullImageCmd(any());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"linux/amd64"})
+    void rejectsWrongLocalPlatformWithoutPulling(String platform) {
+        DockerClient dockerClient = mock(DockerClient.class);
+        InspectImageCmd inspectImage = mock(InspectImageCmd.class);
+        when(dockerClient.inspectImageCmd(IMAGE)).thenReturn(inspectImage);
+        when(inspectImage.exec()).thenReturn(new InspectImageResponse()
+                .withId("sha256:arm64").withOs("linux").withArch("arm64"));
+
+        DockerClientException failure = assertThrows(DockerClientException.class,
+                () -> newService(dockerClient, true).ensureImageExists(IMAGE, platform));
+
+        assertTrue(failure.getMessage().contains("linux/amd64"));
+        assertTrue(failure.getMessage().contains("local platform linux/arm64"));
+        verify(dockerClient, never()).pullImageCmd(any());
+    }
+
+    @Test
+    void rejectsRemovedCachedImageWithoutPulling() {
+        DockerClient dockerClient = mock(DockerClient.class);
+        InspectImageCmd inspectImage = mock(InspectImageCmd.class);
+        InspectImageCmd inspectCached = mock(InspectImageCmd.class);
+        when(dockerClient.inspectImageCmd(IMAGE)).thenReturn(inspectImage);
+        when(dockerClient.inspectImageCmd("sha256:prepared")).thenReturn(inspectCached);
+        when(inspectImage.exec()).thenReturn(new InspectImageResponse()
+                        .withId("sha256:prepared").withOs("linux").withArch("amd64"))
+                .thenThrow(new NotFoundException("image removed"));
+        when(inspectCached.exec()).thenThrow(new NotFoundException("image removed"));
+
+        ImageCacheService service = newService(dockerClient, true);
+        assertEquals("sha256:prepared", service.ensureImageExists(IMAGE));
+        assertThrows(DockerClientException.class, () -> service.ensureImageExists(IMAGE));
+        verify(dockerClient, never()).pullImageCmd(any());
+    }
 
     @Test
     void pullsImageWhenInspectionReportsNotFound() throws Exception {
@@ -337,6 +411,10 @@ class ImageCacheServiceTest {
     }
 
     private static ImageCacheService newService(DockerClient dockerClient) {
+        return newService(dockerClient, false);
+    }
+
+    private static ImageCacheService newService(DockerClient dockerClient, boolean imagePullDisabled) {
         InfoCmd infoCmd = mock(InfoCmd.class);
         when(dockerClient.infoCmd()).thenReturn(infoCmd);
         when(infoCmd.exec()).thenReturn(new Info().withOsType("linux").withArchitecture("amd64"));
@@ -344,6 +422,7 @@ class ImageCacheServiceTest {
         EmulatorConfig.DockerConfig dockerConfig = mock(EmulatorConfig.DockerConfig.class);
         when(config.docker()).thenReturn(dockerConfig);
         when(dockerConfig.registryCredentials()).thenReturn(List.of());
+        when(dockerConfig.imagePullDisabled()).thenReturn(imagePullDisabled);
         return new ImageCacheService(dockerClient, config);
     }
 }

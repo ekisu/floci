@@ -28,6 +28,16 @@ public class CloudFormationTemplateEngine {
     private final String accountId;
     private final String region;
     private final String stackName;
+    private String namingRoot;
+    private String namingPath = "";
+
+    void setNamingScope(String root, String path) {
+        namingRoot = root;
+        namingPath = path;
+    }
+
+    String namingRoot() { return namingRoot == null ? stackName : namingRoot; }
+    String namingPath(String logicalId) { return namingPath + logicalId; }
     private final String stackId;
     private final Map<String, String> parameters;
     private final Map<String, String> physicalIds;

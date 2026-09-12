@@ -26,6 +26,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -255,7 +258,7 @@ class LambdaImageConfigTest {
             when(runtimeApiServerFactory.create()).thenReturn(runtimeApiServer);
             when(runtimeApiServer.getPort()).thenReturn(9000);
             when(dockerHostResolver.resolve()).thenReturn("127.0.0.1");
-            when(lifecycleManager.create(any())).thenReturn("container-123");
+            lenient().when(lifecycleManager.create(any())).thenReturn("container-123");
             when(lifecycleManager.startCreated(eq("container-123"), any()))
                     .thenReturn(new ContainerLifecycleManager.ContainerInfo("container-123", Map.of()));
             when(lifecycleManager.getDockerClient()).thenReturn(dockerClient);
@@ -374,6 +377,36 @@ class LambdaImageConfigTest {
             fn.setPackageType("Image");
             fn.setImageUri("localhost/my-image:latest");
             return fn;
+        }
+
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = {"x86_64", "arm64"})
+        void qualifiedRuntimeImageMatchesSelectedContainerPlatform(String architecture, @TempDir Path codeDir) {
+            when(config.services().lambda().architectureQualifiedImages()).thenReturn(true);
+            when(config.services().lambda().honourArchitectures()).thenReturn(true);
+            String nativeArchitecture = architecture == null ? "x86_64" : architecture;
+            String platform = nativeArchitecture.equals("arm64") ? "linux/arm64" : "linux/amd64";
+            String image = "facio-sandbox-native-runtime-v1/lambda/provided:al2023-" + nativeArchitecture;
+            when(imageResolver.resolve("provided.al2023", nativeArchitecture)).thenReturn(image);
+            when(ecrRegistryManager.rewriteImageUri(image)).thenReturn(image);
+            when(lifecycleManager.create(any(), eq(platform))).thenReturn("container-123");
+            LambdaFunction fn = new LambdaFunction();
+            fn.setFunctionName("native-provided");
+            fn.setRuntime("provided.al2023");
+            fn.setHandler("main");
+            fn.setPackageType("Zip");
+            fn.setCodeLocalPath(codeDir.toString());
+            if (architecture != null) {
+                fn.setArchitectures(List.of(architecture));
+            }
+
+            launcher.launch(fn);
+
+            ArgumentCaptor<ContainerSpec> specCaptor = ArgumentCaptor.forClass(ContainerSpec.class);
+            verify(lifecycleManager).create(specCaptor.capture(), eq(platform));
+            assertEquals(image, specCaptor.getValue().image());
+            assertEquals(List.of("main"), specCaptor.getValue().cmd());
         }
     }
 

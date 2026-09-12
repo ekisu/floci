@@ -32,6 +32,7 @@ public class ImageCacheService {
     static final long INITIAL_BACKOFF_MS = 500L;
 
     private final DockerClient dockerClient;
+    private final boolean imagePullDisabled;
     private final List<EmulatorConfig.DockerConfig.RegistryCredential> registryCredentials;
     private final Map<ImageKey, String> resolvedImages = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Object> locks = new ConcurrentHashMap<>();
@@ -41,6 +42,7 @@ public class ImageCacheService {
     public ImageCacheService(DockerClient dockerClient, EmulatorConfig config) {
         this.dockerClient = dockerClient;
         this.registryCredentials = config.docker().registryCredentials();
+        this.imagePullDisabled = config.docker().imagePullDisabled();
     }
 
     public String ensureImageExists(String imageUri) {
@@ -67,6 +69,12 @@ public class ImageCacheService {
                 resolvedImages.put(imageKey, resolvedImage);
                 LOG.infov("Image already present locally, skipping pull: {0}", imageUri);
                 return resolvedImage;
+            }
+            if (imagePullDisabled) {
+                throw new DockerClientException("Image pulls are disabled by floci.docker.image-pull-disabled; "
+                        + "prepare a local image matching platform " + requestedPlatform + ": " + imageUri
+                        + (localImage == null ? " (image missing)"
+                        : " (local platform " + localImage.getOs() + "/" + localImage.getArch() + ")"));
             }
             LOG.infov("Pulling image: {0}", imageUri);
             try {
@@ -154,7 +162,7 @@ public class ImageCacheService {
         if (resolvedImage == null) {
             return null;
         }
-        if (inspectLocalImage(resolvedImage) != null) {
+        if (matchesPlatform(inspectLocalImage(resolvedImage), imageKey.platform())) {
             return resolvedImage;
         }
         resolvedImages.remove(imageKey, resolvedImage);

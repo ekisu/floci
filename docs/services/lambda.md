@@ -55,6 +55,52 @@ The event invoke configuration is stored and returned as AWS does, and `AWS::Lam
 provisions it from a stack. Asynchronous invocations do not yet apply its retry, event age or
 destination settings.
 
+## Prepared local runtime images
+
+Keep native AWS `Runtime` identifiers in templates and API requests. Set
+`floci.services.lambda.ecr-base-uri` (`FLOCI_SERVICES_LAMBDA_ECR_BASE_URI`) to an
+owned registry/repository namespace, for example `prepared.invalid/sandbox-owner`.
+Floci resolves `python3.7` to `prepared.invalid/sandbox-owner/lambda/python:3.7`,
+`go1.x` to `prepared.invalid/sandbox-owner/lambda/go:1`, and `provided.al2023` to
+`prepared.invalid/sandbox-owner/lambda/provided:al2023`. Prepare those local tags
+from verified image digests before invocation. A mapping does not guarantee that
+a retired runtime image remains available from its original registry.
+
+Set `floci.docker.image-pull-disabled=true` (`FLOCI_DOCKER_IMAGE_PULL_DISABLED=true`)
+to require prepared local images. This policy applies to all images resolved by
+the shared Docker image cache, including non-Lambda containers and custom image
+URIs. Missing images or images with a different OS/architecture fail before any
+pull; matching images resolve to their inspected image IDs. Cached image IDs are
+rechecked before reuse. The default is `false`, preserving automatic pulls.
+
+Set `floci.services.lambda.honour-architectures=true`
+(`FLOCI_SERVICES_LAMBDA_HONOUR_ARCHITECTURES=true`) to select the function's native
+`Architectures` value, including its default `x86_64`. Otherwise the Docker
+daemon's platform is used. A local tag must resolve to the requested platform;
+preparing only ARM64 on an x86_64 request fails closed.
+
+For separate local tags per AWS architecture, also enable
+`floci.services.lambda.architecture-qualified-images`
+(`FLOCI_SERVICES_LAMBDA_ARCHITECTURE_QUALIFIED_IMAGES=true`, default `false`).
+This requires `honour-architectures=true` and appends `-x86_64` or `-arm64` to
+managed runtime tags, defaulting an omitted architecture to `x86_64`. Custom
+image URIs are unchanged. For example:
+
+```sh
+FLOCI_SERVICES_LAMBDA_ECR_BASE_URI=facio-sandbox-native-runtime-v1
+FLOCI_SERVICES_LAMBDA_HONOUR_ARCHITECTURES=true
+FLOCI_SERVICES_LAMBDA_ARCHITECTURE_QUALIFIED_IMAGES=true
+FLOCI_DOCKER_IMAGE_PULL_DISABLED=true
+```
+
+With these settings, `provided.al2023` resolves to
+`facio-sandbox-native-runtime-v1/lambda/provided:al2023-x86_64` or
+`facio-sandbox-native-runtime-v1/lambda/provided:al2023-arm64`.
+
+`go1.x` requires a compatible Go managed-runtime image and handler executable.
+It is not an alias for `provided.al2` or `provided.al2023`, whose custom-runtime
+entrypoint expects a `bootstrap` executable.
+
 ## Hot-Reloading via Reactive S3 Sync
 
 Floci supports an automatic hot-reloading mechanism when functions are deployed via S3. This follows the standard AWS behavior where S3 and Lambda interact, but is optimized for a seamless local development experience.

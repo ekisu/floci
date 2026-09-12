@@ -11,6 +11,13 @@ import java.util.*;
 public class Stack {
     private String stackId;
     private String stackName;
+    private String namingRoot;
+    private String namingPath = "";
+
+    public String getNamingRoot() { return namingRoot == null ? stackName : namingRoot; }
+    public void setNamingRoot(String namingRoot) { this.namingRoot = namingRoot; }
+    public String getNamingPath() { return namingPath; }
+    public void setNamingPath(String namingPath) { this.namingPath = namingPath; }
     /** AWS account that owns this stack; absent only on legacy records. */
     private String accountId;
     private String region;

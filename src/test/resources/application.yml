@@ -13,6 +13,8 @@ quarkus:
     parent-first-artifacts: org.apache.groovy:groovy
 
 floci:
+  cloudformation:
+    deterministic-lambda-names: ${FLOCI_CLOUDFORMATION_DETERMINISTIC_LAMBDA_NAMES:false}
   base-url: "http://localhost:4566"
   default-region: us-east-1
   default-account-id: "000000000000"
@@ -107,6 +109,7 @@ floci:
     reject-unknown-service-scope: true
 
   docker:
+    image-pull-disabled: false
     log-max-size: "10m"
     log-max-file: "3"
     resource-namespace: ""
@@ -129,6 +132,7 @@ floci:
     sns:
       enabled: true
     lambda:
+      architecture-qualified-images: false
       enabled: true
       honour-architectures: false
       zip-max-entries: 100000
